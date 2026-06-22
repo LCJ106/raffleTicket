@@ -251,7 +251,7 @@ events.onToast(function(toast) {
     let text = toast.getText();  
     
     // 只处理目标应用
-    if (pkg === "com.steampy.app" && text.includes("观看结束")) {
+    if (pkg === "com.steampy.app" && text=="观看结束，广告奖励发放有延迟，稍后查看") {
         console.log("内容: " + text);
     }
 });
