@@ -40,6 +40,30 @@ var window = floaty.window(
 );
 
 window.setPosition(30, 200);
+setScreenMetrics(1080, 2400);
+
+// ========== 1. 记录进程ID ==========
+let myPid = android.os.Process.myPid();
+console.log("═══════════════════════");
+console.log("脚本启动 PID: " + myPid);
+console.log("时间: " + new Date().toLocaleString());
+console.log("═══════════════════════");
+
+// // ========== 2. 心跳定时器（每500ms输出一次）==========
+// let beatCount = 0;
+// let heartBeat = setInterval(() => {
+//     beatCount++;
+//     let time = new Date().toLocaleTimeString();
+//     let mem = getMemoryInfo();  // 获取内存信息
+//     console.log("💓 心跳 #" + beatCount + " | " + time + " | 内存: " + mem + "MB");
+// }, 500);
+
+// // ========== 3. 获取内存信息的辅助函数 ==========
+// function getMemoryInfo() {
+//     let runtime = java.lang.Runtime.getRuntime();
+//     let used = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
+//     return used.toFixed(2);
+// }
 
 var inputList = [window.intervalInput, window.distanceInput];
 
@@ -59,7 +83,8 @@ inputList.forEach(function (input) {
 
 var running = false;
 var thread = null;
-var runningThread = null;
+var monitorThread = null;
+var closeAdsThread = null;
 let lock = threads.lock();
 
 var downX, downY, winX, winY, isDragging = false;
@@ -123,6 +148,7 @@ window.startBtn.on("click", function () {
     window.distanceInput.setEnabled(false);
     window.statusText.setText("运行中: 每" + interval + "秒滑动");
 
+
     thread = threads.start(function () {
         while (running) {
             // interval大于1保证检测进程已经解除阻塞
@@ -135,47 +161,40 @@ window.startBtn.on("click", function () {
                 lock.unlock();
                 console.log("已执行一次滑动释放锁，等待下一次...");
             }
-            ui.run(function () {
-                window.statusText.setText("运行中: " + new Date().toLocaleTimeString());
-            });
         }
     });
 
-    runningThread = threads.start(function () {
+    monitorThread = threads.start(function () {
         while (running) { // 只要开关开着，就一直循环
             console.log("正在监控界面...");
             // 找到列表容器
-            let recycler = id("recyclerView").findOne(0);
+            let recycler = id("recyclerView").findOnce();
             if (recycler) {
                 let items = recycler.children();
                 for (let i = 0; i < items.length; i++) {
                     let child = items[i];
                     let target = child.findOne(id("actButton"));
                     if (target) {
-                        lock.lock(); //申请锁
-                        console.log("找到申请按钮，点击");
+                        lock.lock(); //申请锁    
                         try {
+                            console.log("找到观看视频按钮，已申请到锁，准备点击");
                             target.click();
                         } finally {
                             lock.unlock(); //释放锁
                         }
                         sleep(1000);
-                        break; // 终止循环，不再检查后面的行
+                        break; //不再检查后面的行
                     }
                 }
-                console.log("监控申请按钮完成，等待下一轮...");
             }
-
 
             let buyButton = className("android.widget.TextView")
                 .textMatches(/^我要.*|.*加速.*/)
-                .findOne(0);
-            // let originalPackage = currentPackage();
-            // console.log("当前应用包名：" + originalPackage);
+                .findOnce();
             if (buyButton) {
-                console.log("检测到我要加速按钮，正在点击...");
                 lock.lock(); //申请锁
                 try {
+                    console.log("检测到我要***按钮，已申请到锁，正在点击...");
                     let bounds = buyButton.bounds();
                     let x = bounds.centerX();
                     let y = bounds.centerY();
@@ -184,38 +203,64 @@ window.startBtn.on("click", function () {
                     lock.unlock(); //释放锁
                 }
                 sleep(20000);; // 点击后跳转到新应用，睡眠20秒
-                console.log("已经跳转20s继续监控界面...");
+                console.log("已经跳转20s，正在申请锁，准备切回steampy");
                 // 加锁切回原应用
                 lock.lock();
                 try {
                     app.launchPackage("com.steampy.app");
-                    console.log("已切回 com.steampy.app");
                 } finally {
                     lock.unlock();
                 }
+                console.log("已释放锁，切回 com.steampy.app");
                 sleep(1000); // 等待界面稳定
             }
 
-            let skipButton = className("android.widget.TextView")
-                .textMatches(/.*跳过.*/)
-                .findOne(0);
-            if (skipButton) {
-                console.log("检测到跳过按钮，正在点击...");
-                lock.lock(); //申请锁
-                try {
-                    let bounds = skipButton.bounds();
-                    let x = bounds.centerX();
-                    let y = bounds.centerY();
-                    click(x, y);
-                } finally {
-                    lock.unlock(); //释放锁
-                }
-                sleep(1000); // 等待界面稳定
-            }
+
             sleep(100);
         }
     });
 });
+
+// 监听所有应用的 Toast
+events.observeToast();
+events.onToast(function (toast) {
+    let pkg = toast.getPackageName();
+    let text = toast.getText();
+
+    // 只处理目标应用
+    if (pkg === "com.steampy.app" && text == "观看结束，广告奖励发放有延迟，稍后查看") {
+        closeAdsThread = threads.start(function () {
+            lock.lock();
+            try {
+                console.log("观看完成，正在关闭广告界面...");
+                let skipButton = className("android.widget.TextView")
+                    .textMatches(/.*跳过.*/)
+                    .findOnce();
+                if (skipButton) {
+                    console.log("检测到跳过按钮，正在点击...");
+                    let bounds = skipButton.bounds();
+                    let x = bounds.centerX();
+                    let y = bounds.centerY();
+                    click(x, y);
+                } else {
+                    // 点击右上角关闭按钮
+                    click(990, 199);
+                    console.log("已点击右上角关闭按钮");          
+                    if (currentActivity().endsWith("Portrait_Activity")) {
+                        // 点击右上角另一个位置的关闭按钮
+                        click(990, 95.5);
+                         // 点击左上角关闭按钮
+                        click(86, 176);
+                        console.log("已点击左上角关闭按钮");
+                    }
+                }
+            } finally {
+                lock.unlock();
+            }
+        });
+
+    }
+})
 
 window.stopBtn.on("click", function () {
     clearFocus();
@@ -228,6 +273,14 @@ function stopScript() {
     if (thread) {
         thread.interrupt();
         thread = null;
+    }
+    if (monitorThread) {
+        monitorThread.interrupt();
+        monitorThread = null;
+    }
+    if (closeAdsThread) {
+        closeAdsThread.interrupt();
+        closeAdsThread = null;
     }
     window.startBtn.setEnabled(true);
     window.stopBtn.setEnabled(false);
@@ -244,30 +297,6 @@ function swipeDown(distance) {
 }
 setInterval(() => { }, 1000);
 
-// 监听所有应用的 Toast
-events.observeToast();
-events.onToast(function(toast) {
-    let pkg = toast.getPackageName();
-    let text = toast.getText();  
-    
-    // 只处理目标应用
-    if (pkg === "com.steampy.app" && text=="观看结束，广告奖励发放有延迟，稍后查看") {
-        console.log("内容: " + text);
-    }
-});
-
-// // 在子线程中监听
-// threads.start(function() {
-//     while (running) { // 只要开关开着，就一直循环
-//         let buyButton = className("android.widget.TextView").text("立即抢购").findOne(0);
-//         if (buyButton) {
-//             console.log("检测到立即抢购按钮，正在点击...");
-//             buyButton.click();
-//             sleep(1000); // 点击后冷却
-//         }
-//         sleep(100);
-//     }
-// });
 // ^	匹配行的开始 $	匹配行的结束 .	匹配除换行符以外的任意字符。 *	匹配前面的子表达式零次或多次
 // ?	匹配前面的子表达式零次或一次  +	匹配前面的子表达式一次或多次
 // {n}	匹配前面出现的子表达式恰好 n 次  {n,}	匹配前面出现的子表达式至少 n 次
@@ -277,5 +306,5 @@ events.onToast(function(toast) {
 // id("ff60eb").waitFor()
 // id("bc542e").findOne().click()
 // centerX(790).centerY(94, 95)
-// id("cccdd1").findOne().click()   
+// id("cccdd1").findOne().click()
 // className("android.widget.TextView").text("打开App体验15秒，即可获得奖励").findOne().click()

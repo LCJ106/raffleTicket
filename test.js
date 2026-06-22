@@ -24,7 +24,9 @@ while(true) {
     }
 }
 
-// com.qq.e.ads.PortraitADActivity   当前活动: com.bytedance.sdk.openadsdk.stub.activity.Stub_Standard_Portrait_Activity 
+// com.qq.e.ads.PortraitADActivity   
+// 当前活动: com.bytedance.sdk.openadsdk.stub.activity.Stub_Standard_Portrait_Activity 
+// com.bytedance.sdk.openadsdk.stub.activity.Stub_Standard_Portrait_Activity
 // 当前活动: uj.a  kj.b
 // 坐标 973 182 1007 216    center 990 199
 
