@@ -10,7 +10,7 @@ function traverseViews(view) {
       
       classNameSet.add(className);
     }
-    console.log(className, bounds, view.text());
+    console.log(className, bounds, view.text(), view.id());
     // 如果控件是容器类型，则继续遍历其子控件
     if (view.childCount() > 0) {
       for (var i = 0; i < view.childCount(); i++) {
