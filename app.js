@@ -87,7 +87,7 @@ var monitorThread = null;
 var closeAdsThread = null;
 let isPaused = threads.atomic(0);
 let lockScreen = threads.lock();
-let wxGameSleepTime = 5000;
+let wxGameSleepTime = 20000;
 
 var downX, downY, winX, winY, isDragging = false;
 window.titleBar.setOnTouchListener(function (view, event) {
@@ -209,7 +209,7 @@ window.startBtn.on("click", function () {
 
             // 检测为微信小游戏广告
             let gameButton = className("android.widget.TextView")
-                .textMatches(/.*微信小游戏.*/)
+                .textMatches(/.*微信.*/)
                 .findOnce();
             if (gameButton) {
                 lockScreen.lock(); //申请锁
@@ -220,27 +220,27 @@ window.startBtn.on("click", function () {
                     let y = bounds.centerY();
                     click(x, y);
                     sleep(100);
-                    let wxView = id("icon").className("android.widget.ImageView")
-                        .desc("微信").findOnce().parent();
+                    // id : com.miui.securitycore:id/app1   id : com.miui.securitycore:id/app2;
+                    let wxView = id("app1").findOnce();
                     if (wxView) {
-                        let wxBounds = wxView.bounds();
-                        let wxX = wxBounds.centerX();
-                        let wxY = wxBounds.centerY();
-                        click(wxX, wxY);
+                        // let wxBounds = wxView.bounds();
+                        // let wxX = wxBounds.centerX();
+                        // let wxY = wxBounds.centerY();
+                        // click(wxX, wxY);
+                        wxView.click();
                     }
                 } finally {
                     lockScreen.unlock(); //释放锁
 
                 }
-
                 sleep(wxGameSleepTime); // 点击后跳转到wx休眠5s
-                console.log("微信小程序已经跳转5s，正在申请锁，准备切回steampy");
+                console.log("微信小程序已经跳转"+ wxGameSleepTime/1000 +"s，正在申请锁，准备切回steampy");
                 lockScreen.lock();
                 try {
                     app.launchPackage("com.steampy.app");
                 } finally {
                     lockScreen.unlock();
-                    console.log("已释放锁，切回 com.steampy.app");
+                    console.log("已释放锁，从微信切回 com.steampy.app");
                 }
                 sleep(1000); // 等待界面稳定
                 continue;
@@ -269,6 +269,7 @@ window.startBtn.on("click", function () {
                         x = bounds.centerX();
                         y = bounds.centerY();
                     } else if (speedButton) {
+                        // 识别不到中间的弹窗  使用固定位置
                         console.log("检测到按钮:" + speedButton.text() + "，已申请到锁，正在点击...");
                         // x = 555;
                         x = 800;
@@ -296,6 +297,8 @@ window.startBtn.on("click", function () {
                             clickWithFlash(x, y);
                         }
                     }
+                    //sleep让页面稳定，防止坐标正确却点击不到的问题；
+                    sleep(100)
                     click(x, y);
                     console.log("监控线程最终点击位置 点击坐标: " + x + ", " + y);
                 } finally {
