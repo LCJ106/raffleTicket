@@ -26,7 +26,7 @@ var root = className("android.widget.FrameLayout").findOne();
 
 // 开始遍历
 traverseViews(root);
-// 800 1580        返回广告页 还没有浏览完成  滑动线程 触发广告跳转按钮，无法返回再次返回
+// 800 1580       
 
 // 跳转后=》切回steampy
 // // 20:15:38.642/V: 开始运行 [$remote/getNodeTree.js].

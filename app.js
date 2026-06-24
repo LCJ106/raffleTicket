@@ -40,7 +40,7 @@ var window = floaty.window(
 );
 
 window.setPosition(30, 200);
-setScreenMetrics(1080, 2400);
+// setScreenMetrics(1080, 2400);
 
 // ========== 1. 记录进程ID ==========
 let myPid = android.os.Process.myPid();
@@ -269,7 +269,7 @@ window.startBtn.on("click", function () {
                 try {
                     let x, y;
                     if (buyButton || continueBnt) {
-                        console.log("检测到按钮:" + buyButton.text() + "，已申请到锁，正在点击...");
+                        console.log("检测到可点击广告按钮"  + "，已申请到锁，正在点击...");
                         let bounds = buyButton.bounds();
                         x = bounds.centerX();
                         y = bounds.centerY();
@@ -289,7 +289,10 @@ window.startBtn.on("click", function () {
                             let bounds = clickAdsButton.bounds();
                             x = bounds.centerX();
                             y = bounds.centerY();
-                            console.log("首次点击广告位置 点击坐标: " + x + ", " + y);
+                            console.log("首次检测到广告的位置 点击坐标: " + x + ", " + y);
+                            if(!newClickAdsButton){
+                                console.log("等待100ms后页面就检测不到");
+                            }
                             continue;
                         } else {
                             clickAdsButtonCount = 0;
@@ -303,8 +306,11 @@ window.startBtn.on("click", function () {
                         }
                     }
                     //sleep让页面稳定，防止坐标正确却点击不到的问题；
-                    sleep(100)
+                    sleep(100);
                     click(x, y);
+                    if(continueBnt){
+                        speedBtnIntc.set(0);
+                    }
                     console.log("监控线程最终点击位置 点击坐标: " + x + ", " + y);
                 } finally {
                     lockScreen.unlock(); //释放锁
@@ -366,6 +372,7 @@ events.onToast(function (toast) {
                 exitAds(lockScreen);
             } finally {
                 isPaused.set(0);
+                speedBtnIntc.set(0);
             }
         });
     }
