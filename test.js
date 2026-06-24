@@ -1,49 +1,48 @@
-// 监听所有应用的 Toast
-events.observeToast();
-console.log("当前活动: " + currentActivity());
 activityList = []
 pkgList = []
-events.onToast(function(toast) {
-    let pkg = toast.getPackageName();
-    let text = toast.getText();
-    
-    // console.log("Toast来自: " + pkg);
-    // console.log("当前活动: " + currentActivity());
-    // console.log("内容: " + text);
-    // 只处理目标应用
-    // if (pkg === "com.steampy.app") {
-    //     console.log("✅ 目标应用加速成功");
-        
-    // }
-});
-while(true) {   
-    sleep(100);
-    let current = currentActivity();
-    android.widget.FrameLayout
-    let pkg = currentPackage();
-    if(current!="android.widget.FrameLayout"){
-         console.log("当前活动: " + current);
-    }
-    if (!pkgList.includes(pkg)) {
-        pkgList.push(pkg);
-        
-        // console.log("活动列表"+ activityList + " 包列表" + pkgList);
-    }
-    if (!activityList.includes(current)) {
-        activityList.push(current);
-        // console.log("当前活动: " + current);
-        // console.log("活动列表"+ activityList + " 包列表" + pkgList);
-    }
-}
-
+// 监听所有应用的 Toast
+events.observeToast();
+// console.log("当前活动: " + currentActivity());
 events.observeKey();
 events.onKeyDown("volume_up", function() {
     let current = currentActivity();
     let pkg = currentPackage();
-    console.log("当前包: " + pkg);
-    console.log("当前活动: " + current);
+    console.log("关闭前当前包: " + pkg);
+    console.log("关闭前当前活动: " + current);
+    console.log(pkgList);
+    console.log(activityList);
     exit();
 });
+
+// events.onToast(function(toast) {
+//     let pkg = toast.getPackageName();
+//     let text = toast.getText();
+    
+//     // console.log("Toast来自: " + pkg);
+//     // console.log("当前活动: " + currentActivity());
+//     // console.log("内容: " + text);
+//     // 只处理目标应用
+//     // if (pkg === "com.steampy.app") {
+//     //     console.log("✅ 目标应用加速成功");
+        
+//     // }
+// });
+while(true) {   
+    let current = currentActivity();
+
+    let pkg = currentPackage();
+    if (!pkgList.includes(pkg)) {
+        pkgList.push(pkg);
+        console.log("当前包" + pkg);
+    }
+    if (!activityList.includes(current)) {
+        activityList.push(current);
+        console.log("当前活动: " + current);
+        // console.log("活动列表"+ activityList + " 包列表" + pkgList);
+    }
+}
+
+
 
 // 微信小程序游戏对应广告活动 com.qq.e.ads.PortraitADActivity
 // 选择双开微信时的运行包: com.miui.securitycore

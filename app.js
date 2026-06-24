@@ -86,6 +86,8 @@ var thread = null;
 var monitorThread = null;
 var closeAdsThread = null;
 let isPaused = threads.atomic(0);
+// 点击几种广告按钮后，跳转回steampy前，阻塞 thread
+let speedBtnIntc = threads.atomic(0);
 let lockScreen = threads.lock();
 let wxGameSleepTime = 20000;
 
@@ -153,14 +155,14 @@ window.startBtn.on("click", function () {
 
     thread = threads.start(function () {
         while (running) {
-            if (isPaused.get() === 1) {
-                sleep(1000);
-                console.log("滑动线程被关闭广告线程阻塞");
-                continue;
-            }
             // interval大于1保证检测进程已经解除阻塞
             sleep(interval * 1000);
             if (!running) break;
+            if (isPaused.get() === 1 && speedBtnIntc.get() === 1) {
+                sleep(1000);
+                console.log("滑动线程被关闭广告线程阻塞");
+                continue;
+            }              
             lockScreen.lock();
             try {
                 swipeDown(distance);
@@ -214,7 +216,7 @@ window.startBtn.on("click", function () {
             if (gameButton) {
                 lockScreen.lock(); //申请锁
                 try {
-                    console.log("检测到小游戏广告，已申请到锁，准备点击...");
+                    console.log("检测到小游戏广告，已申请到锁，准备点击..." + "按钮文本：" + gameButton.text());
                     let bounds = gameButton.bounds();
                     let x = bounds.centerX();
                     let y = bounds.centerY();
@@ -231,9 +233,8 @@ window.startBtn.on("click", function () {
                     }
                 } finally {
                     lockScreen.unlock(); //释放锁
-
                 }
-                sleep(wxGameSleepTime); // 点击后跳转到wx休眠5s
+                sleep(wxGameSleepTime); // 点击后跳转到wx休眠
                 console.log("微信小程序已经跳转"+ wxGameSleepTime/1000 +"s，正在申请锁，准备切回steampy");
                 lockScreen.lock();
                 try {
@@ -259,11 +260,15 @@ window.startBtn.on("click", function () {
                 .textMatches(/点击广告拿奖励/)
                 .findOnce();
 
-            if (buyButton || speedButton || clickAdsButton) {
+            let continueBnt = className("android.widget.TextView")
+                .textStartWith("继续")
+                .findOnce();
+
+            if (buyButton || speedButton || clickAdsButton ||continueBnt) {
                 lockScreen.lock(); //申请锁
                 try {
                     let x, y;
-                    if (buyButton) {
+                    if (buyButton || continueBnt) {
                         console.log("检测到按钮:" + buyButton.text() + "，已申请到锁，正在点击...");
                         let bounds = buyButton.bounds();
                         x = bounds.centerX();
@@ -294,7 +299,7 @@ window.startBtn.on("click", function () {
                             y = bounds.centerY() - 80;//文字位置偏下，向上偏移
                             console.log(clickAdsButton.text() + "点击坐标: " + x + ", " + y);
 
-                            clickWithFlash(x, y);
+                            // clickWithFlash(x, y);
                         }
                     }
                     //sleep让页面稳定，防止坐标正确却点击不到的问题；
@@ -316,6 +321,8 @@ window.startBtn.on("click", function () {
                     // 有可能跳转时就产生了奖励toast,这时在toast处理函数中切回steampy并关闭广告，
                     // 这种情况下monitorThread休眠20s后不用再切回steampy
                     // 加锁切回原应用
+                    speedBtnIntc.set(1);
+                    sleep(100);//休眠100ms让滑动线程被speedBtnIntc阻塞
                     lockScreen.lock();
                     try {
                         app.launchPackage("com.steampy.app");
@@ -327,10 +334,7 @@ window.startBtn.on("click", function () {
                 sleep(1000); // 等待界面稳定
                 continue;
             }
-
-
-
-            sleep(1000);
+            sleep(500);
         }
     });
 });
@@ -444,16 +448,16 @@ function exitAds(lock) {
     }
 }
 
-function clickWithFlash(x, y) {
-    // 1. 创建一个浮窗，显示红色圆点
-    let w = floaty.window(
-        <frame w="80" h="80">
-            <view w="80" h="80" bg="#FFFF0000" alpha="0.6" radius="40" />
-        </frame>
-    );
-    // 将浮窗定位到点击坐标（让圆点中心对准点击位置）
-    w.setPosition(x - 40, y - 40);
-}
+// function clickWithFlash(x, y) {
+//     // 1. 创建一个浮窗，显示红色圆点
+//     let w = floaty.window(
+//         <frame w="80" h="80">
+//             <view w="80" h="80" bg="#FFFF0000" alpha="0.6" radius="40" />
+//         </frame>
+//     );
+//     // 将浮窗定位到点击坐标（让圆点中心对准点击位置）
+//     w.setPosition(x - 40, y - 40);
+// }
 setInterval(() => { }, 1000);
 
 // ^	匹配行的开始 $	匹配行的结束 .	匹配除换行符以外的任意字符。 *	匹配前面的子表达式零次或多次
