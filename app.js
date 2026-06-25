@@ -354,10 +354,6 @@ window.startBtn.on("click", function () {
                     //sleep让页面稳定，防止坐标正确却点击不到的问题；
                     // sleep(100);
                     click(x, y);
-                    // 广告页的弹窗，点击后页面不会跳转，所以需要进入下一次循环来继续识别按钮
-                    if (continueBtn) {
-                        speedBtnIntc.set(0);
-                    }
                     sleep(100);
                     if(currentPackage() === steampyPkg) {  // 没发生跳转，可能按钮在靠右边的位置
                         x += 60;
@@ -369,8 +365,14 @@ window.startBtn.on("click", function () {
                         wxView.click();
                     }
                     console.log("监控线程最终点击位置 点击坐标: " + x + ", " + y);
+                    // 点击广告页的弹窗，页面没有跳转，所以需要进入下一次循环来继续识别按钮
                     if(currentPackage() === steampyPkg){
                         continue;
+                    }
+                    //发生了跳转，是继续按钮，跳转后需要滑动屏幕，解除滑动线程的阻塞 
+                    //其他场景是点击观看视频 后 在windowschanged中解除阻塞
+                    if (continueBtn) {
+                        speedBtnIntc.set(0);
                     }
                 } finally {
                     lockScreen.unlock(); //释放锁
