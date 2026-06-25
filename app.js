@@ -124,7 +124,7 @@ function onWindowStateChanged(event) {
                     }
                 }
             }
-            if (isActBtnExists) {
+            if (!isActBtnExists) {
                 console.log("! 未检测到观看视频按钮");
             }
         });
@@ -262,10 +262,11 @@ window.startBtn.on("click", function () {
                 try {
                     console.log("检测到小游戏广告，已申请到锁，准备点击..." + "按钮文本：" + gameButton.text());                   
                     click(x, y);
-                    sleep(100);
+                    sleep(500);
                     // id : com.miui.securitycore:id/app1   id : com.miui.securitycore:id/app2;
                     let wxView = id("app1").findOnce();
                     if (wxView) {
+                        console.log("点击weixin");
                         wxView.click();
                     }
                 } finally {
@@ -284,7 +285,7 @@ window.startBtn.on("click", function () {
                 continue;
             }
 
-
+            sleep(100);//有时候会检测到左上角 去加速，“我要***”会过一会才出现
             let buyButton = className("android.widget.TextView")
                 .textMatches(/^我要.*/)
                 .findOnce();
@@ -297,20 +298,28 @@ window.startBtn.on("click", function () {
                 .textMatches(/点击广告拿奖励/)
                 .findOnce();
 
-            let continueBnt = className("android.widget.TextView")
-                .textStartWith("继续")
-                .findOnce();
+            let continueBtn = className("android.widget.TextView")
+                                 .textMatches(/.*继续.*/)
+                                 .findOnce() || 
+                              className("android.widget.Button")
+                                 .textMatches(/.*继续.*/)
+                                 .findOnce();
 
-            if (buyButton || speedButton || clickAdsButton || continueBnt) {
+            //monitor休眠时 toast已领取奖励，monitor休眠后点击跳过，出现的弹窗
+            // 需要进行点击避免卡死
+            // let continueBtnGetReward = id("continue_button").findOnce();
+
+            if (buyButton || speedButton || clickAdsButton || continueBtn) {
                 lockScreen.lock(); //申请锁
                 try {
                     let x, y, bounds;
-                    if (buyButton || continueBnt) {
+                    let btn = buyButton || continueBtn;
+                    if (btn) {
                         console.log("检测到可点击广告按钮" + "，已申请到锁，正在点击...");
-                        bounds = buyButton.bounds();
+                        bounds = btn.bounds();
                         x = bounds.centerX();
                         y = bounds.centerY();
-                    } else if (speedButton) {
+                    }else if (speedButton) {
                         // 识别不到中间的弹窗  使用固定位置
                         console.log("检测到按钮:" + speedButton.text() + "，已申请到锁，正在点击...");
                         // x = 555;
@@ -319,7 +328,7 @@ window.startBtn.on("click", function () {
                     } else {
                         clickAdsButtonCount++;
                         if (clickAdsButtonCount === 1) {
-                            sleep(100);
+                            sleep(1000);
                             let newClickAdsButton = className("android.widget.TextView")
                                 .textMatches(/点击广告拿奖励/)
                                 .findOnce();
@@ -337,16 +346,32 @@ window.startBtn.on("click", function () {
                             bounds = clickAdsButton.bounds();
                             x = bounds.centerX();
                             y = bounds.centerY() - 80;//文字位置偏下，向上偏移
+                            sleep(5000);
+                            longClick(x, y);
                             console.log(clickAdsButton.text() + "点击坐标: " + x + ", " + y);
                         }
                     }
                     //sleep让页面稳定，防止坐标正确却点击不到的问题；
-                    sleep(100);
+                    // sleep(100);
                     click(x, y);
-                    if (continueBnt) {
+                    // 广告页的弹窗，点击后页面不会跳转，所以需要进入下一次循环来继续识别按钮
+                    if (continueBtn) {
                         speedBtnIntc.set(0);
                     }
+                    sleep(100);
+                    if(currentPackage() === steampyPkg) {  // 没发生跳转，可能按钮在靠右边的位置
+                        x += 60;
+                        click(x, y);
+                    }
+                    let wxView = id("app1").findOnce();
+                    // 弹出双开应用，表明是小程序广告，要进行选择
+                    if (wxView) {
+                        wxView.click();
+                    }
                     console.log("监控线程最终点击位置 点击坐标: " + x + ", " + y);
+                    if(currentPackage() === steampyPkg){
+                        continue;
+                    }
                 } finally {
                     lockScreen.unlock(); //释放锁
                 }
@@ -456,7 +481,7 @@ function swipeDown(distance) {
 }
 
 function exitAds() {
-    lock.lock();
+    lockScreen.lock();
     sleep(1000); // 等待界面稳定
     console.log("观看完成，已获得锁，正在关闭广告界面...");
     try {
