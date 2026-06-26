@@ -85,15 +85,23 @@ var running = false;
 var thread = null;
 var monitorThread = null;
 var closeAdsThread = null;
+let appTimeMonitorTimer = null;
+let appTimeMonitorThread = null;
 var isPaused = threads.atomic(0);
 // 点击几种广告按钮后，跳转回steampy前，阻塞 thread
 var speedBtnIntc = threads.atomic(0);
 var lockScreen = threads.lock();
-// 跳转微信后 20s后返回
-var wxGameSleepTime = 20000;
-var steampyPkg = "com.steampy.app";
-var steampyActivity = "com.steampy.app.activity.buy.zeropurchase.info.ZeroBuyInfoActivity";
-var rewardToastText = "观看结束，广告奖励发放有延迟，稍后查看";
+// 跳转其他app后 20s后返回
+const otherAppSleepTime = 20 * 1000;
+// 在其他app停留的最长时间
+const otherAppMaxTime = 25 * 1000;
+let enterTime = 0;         // 进入当前 App 的时间戳
+let actionTriggered = false; // 本次停留是否已触发过操作
+let androidCurrentPackage = ""; 
+const steampyPkg = "com.steampy.app";
+const steampyActivity = "com.steampy.app.activity.buy.zeropurchase.info.ZeroBuyInfoActivity";
+const rewardToastText = "观看结束，广告奖励发放有延迟，稍后查看";
+const adsActivityKeyWord = "Portrait";
 
 var downX, downY, winX, winY, isDragging = false;
 function onWindowStateChanged(event) {
@@ -272,8 +280,8 @@ window.startBtn.on("click", function () {
                 } finally {
                     lockScreen.unlock(); //释放锁
                 }
-                sleep(wxGameSleepTime); // 点击后跳转到wx休眠
-                console.log("微信小程序已经跳转" + wxGameSleepTime / 1000 + "s，正在申请锁，准备切回steampy");
+                sleep(otherAppSleepTime); // 点击后跳转到wx休眠
+                console.log("微信小程序已经跳转" + otherAppSleepTime / 1000 + "s，正在申请锁，准备切回steampy");
                 lockScreen.lock();
                 try {
                     app.launchPackage(steampyPkg);
@@ -289,6 +297,9 @@ window.startBtn.on("click", function () {
             let buyButton = className("android.widget.TextView")
                 .textMatches(/^我要.*/)
                 .findOnce();
+            if(buyButton){
+                console.log("是  我要***按钮");
+            }
 
             let speedButton = className("android.widget.TextView")
                 .textMatches(/.*加速.*/)
@@ -305,6 +316,11 @@ window.startBtn.on("click", function () {
                                  .textMatches(/.*继续.*/)
                                  .findOnce();
 
+            if(continueBtn){
+                console.log("是  继续***按钮");
+            }
+
+
             //monitor休眠时 toast已领取奖励，monitor休眠后点击跳过，出现的弹窗
             // 需要进行点击避免卡死
             // let continueBtnGetReward = id("continue_button").findOnce();
@@ -313,6 +329,8 @@ window.startBtn.on("click", function () {
                 lockScreen.lock(); //申请锁
                 try {
                     let x, y, bounds;
+                    let xOffset = 0;
+                    let yOffset = 0;
                     let btn = buyButton || continueBtn;
                     if (btn) {
                         console.log("检测到可点击广告按钮" + "，已申请到锁，正在点击...");
@@ -338,6 +356,9 @@ window.startBtn.on("click", function () {
                             console.log("首次检测到广告的位置 点击坐标: " + x + ", " + y);
                             if (!newClickAdsButton) {
                                 console.log("等待100ms后页面就检测不到");
+                            }else{
+                                console.log("等待100ms后检测到广告的位置 点击坐标: " + newClickAdsButton.bounds().centerX() 
+                                + ", " + newClickAdsButton.bounds().centerY());
                             }
                             continue;
                         } else {
@@ -355,9 +376,17 @@ window.startBtn.on("click", function () {
                     // sleep(100);
                     click(x, y);
                     sleep(100);
-                    if(currentPackage() === steampyPkg) {  // 没发生跳转，可能按钮在靠右边的位置
-                        x += 60;
+                    if(currentPackage() === steampyPkg && bounds) {  // 没发生跳转，可能按钮在靠右边的位置
+                        xOffset = bounds.width()/3;
+                        // x += 60;
+                        x += xOffset;
                         click(x, y);
+                        sleep(100);
+                        if(currentPackage() === steampyPkg){
+                            yOffset = bounds.height()*0.37;
+                            y += yOffset;
+                            click(x, y);
+                        }
                     }
                     let wxView = id("app1").findOnce();
                     // 弹出双开应用，表明是小程序广告，要进行选择
@@ -377,11 +406,11 @@ window.startBtn.on("click", function () {
                 } finally {
                     lockScreen.unlock(); //释放锁
                 }
-                sleep(20000);; // 点击后跳转到新应用，monitorThread睡眠20秒
+                sleep(otherAppSleepTime);; // 点击后跳转到新应用，monitorThread睡眠20秒
                 console.log("已经跳转20s，正在申请锁，准备切回steampy");
                 pkg = currentPackage();
                 activity = currentActivity();
-                if (pkg === steampyPkg && activity !== steampyActivity) {
+                if (pkg === steampyPkg && activity.includes(adsActivityKeyWord)) {
                     // 看的是原应用的广告，无需跳转，直接退出广告，没有toast通知
                     console.log("浏览steampy广告未发生跳转，正在申请锁，准备退出广告")
                     exitAds();
@@ -407,6 +436,42 @@ window.startBtn.on("click", function () {
             sleep(1000);
         }
     });
+
+    appTimeMonitorThread = threads.start(function () {
+        // 定时检测循环
+        appTimeMonitorTimer = setInterval(() => {
+            let pkg = currentPackage(); // 获取当前前台包名（需无障碍权限）
+
+            // 如果包名为空（如锁屏、桌面切换中），忽略本次检测
+            if (!pkg) return;
+
+            if (pkg !== androidCurrentPackage) {
+                // 切换到了新 App，重置所有状态
+                androidCurrentPackage = pkg;
+                enterTime = Date.now();
+                actionTriggered = false;
+            } else if (pkg !== steampyPkg) {
+                // 非 steampyPkg，计算已停留时间
+                let elapsed = Date.now() - enterTime;
+                
+                if (!actionTriggered && elapsed >= otherAppMaxTime) {
+                    actionTriggered = true; // 防止重复触发
+                    console.log("超时发生，准备切回，已停留在" + pkg + elapsed + "ms");
+                    // 切回steampy
+                    lockScreen.lock();
+                    try {
+                        app.launchPackage(steampyPkg);
+                    } finally {
+                        lockScreen.unlock();
+                    }
+                }
+            }
+        }, 1000); // 每秒检测一次，平衡性能与精确度
+    });
+
+    
+
+
 });
 
 // 监听所有应用的 Toast
@@ -422,7 +487,7 @@ events.onToast(function (toast) {
             try {
                 sleep(500); 
                 let pkgAfterSleep = currentPackage();
-                console.log("已接收到奖励toast，已阻塞其他进程，已休眠500ms，此时pkg: " + pkgAfterSleep);
+                console.log("已接收到奖励toast，已休眠500ms确保阻塞其他进程，此时pkg: " + pkgAfterSleep);
                 if (pkgAfterSleep !== steampyPkg) {
                     // 说明点击广告时直接发放奖励，点击后跳转到了其他app，需要先回到steampy再执行退出操作
                     console.log("奖励toast播报时切到了其他app，正在申请锁切回" + steampyPkg);
@@ -445,6 +510,7 @@ window.closeBtn.on("click", function () {
     stopScript();
     window.close();
     auto.removeEvent("WINDOW_STATE_CHANGED");
+    events.removeAllListeners("toast");
     exit();
 });
 
@@ -468,6 +534,16 @@ function stopScript() {
         closeAdsThread.interrupt();
         closeAdsThread = null;
     }
+    if(appTimeMonitorThread){
+        appTimeMonitorThread.interrupt();
+        appTimeMonitorThread = null;
+    }
+
+    if (appTimeMonitorTimer) {
+        clearInterval(appTimeMonitorTimer);
+        appTimeMonitorTimer = null;
+    }
+
     window.startBtn.setEnabled(true);
     window.stopBtn.setEnabled(false);
     window.intervalInput.setEnabled(true);
@@ -485,6 +561,11 @@ function swipeDown(distance) {
 function exitAds() {
     lockScreen.lock();
     sleep(1000); // 等待界面稳定
+    let originActivity = currentActivity()
+    if(!originActivity.includes(adsActivityKeyWord)){
+        console.log(originActivity+ "查看日志,退出广告时的activity不含有关键词" + adsActivityKeyWord);
+        return;
+    }
     console.log("观看完成，已获得锁，正在关闭广告界面...");
     try {
         // 1. 先退出干扰弹窗
@@ -508,7 +589,7 @@ function exitAds() {
             click(990, 199);
             console.log("已点击右上角坐标" + "，当前活动: " + currentActivity());
             sleep(100);
-            if (!currentActivity().endsWith("ZeroBuyInfoActivity")) {
+            if (currentActivity().includes(adsActivityKeyWord)) {
                 // if (currentActivity().endsWith("Portrait_Activity")) {
                 // 点击右上角另一个位置的关闭按钮
                 click(990, 95.5);
