@@ -9,6 +9,17 @@
 //     Intent.FLAG_ACTIVITY_CLEAR_TOP |
 //     Intent.FLAG_ACTIVITY_SINGLE_TOP
 // );
+let windows = auto.windows;
+    for (let i = 0; i < windows.length; i++) {
+        let root = windows[i];
+        console.log(root)
+    }
+
+
+
+
+
+// com.qq.e.ads.ADActivity 特殊广告页
 // context.startActivity(intent);
 // 微信小程序游戏对应广告活动 com.qq.e.ads.PortraitADActivity
 // 选择双开微信时的运行包: com.miui.securitycore
