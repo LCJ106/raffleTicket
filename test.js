@@ -9,12 +9,7 @@
 //     Intent.FLAG_ACTIVITY_CLEAR_TOP |
 //     Intent.FLAG_ACTIVITY_SINGLE_TOP
 // );
-let windows = auto.windows;
-    for (let i = 0; i < windows.length; i++) {
-        let root = windows[i];
-        console.log(root)
-    }
-
+console.log(currentActivity());
 
 
 

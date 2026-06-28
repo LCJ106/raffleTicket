@@ -113,11 +113,10 @@ const otherAppMaxTime = 20 * 1000;
 var downX, downY, winX, winY, isDragging = false;
 function onWindowStateChanged(event) {
     let packageName = event.packageName;
-    let className = event.className;
+    let currentClassName = event.className;
     // console.log(packageName +"  " + className);
-    if (packageName === steampyPkg && className === steampyActivity) {
+    if (packageName === steampyPkg && currentClassName === steampyActivity) {
         threads.start(function () {
-            console.log(`准备检测"观看视频"按钮`);
             let isExistWatchVideo = false;
             let recycler = id("recyclerView").findOne(1000);
             if (recycler) {
@@ -313,7 +312,7 @@ window.startBtn.on("click", function () {
                 .textMatches(/^我要.*/)
                 .findOnce();
             if(buyButton){
-                console.log("是" + buyButton.text());
+                console.log("检测到我要***按钮：" + buyButton.text());
             }
 
             let speedButton = className("android.widget.TextView")
@@ -374,38 +373,41 @@ window.startBtn.on("click", function () {
                         x = bounds.centerX();
                         y = bounds.centerY();
                     } else {
-                        clickAdsButtonCount++;
-                        if (clickAdsButtonCount === 1) {
+                        // clickAdsButtonCount++;
+                        // if (clickAdsButtonCount === 1) {
                             sleep(1000);
                             let newClickAdsButton = className("android.widget.TextView")
                                 .textMatches(/点击广告拿奖励/)
                                 .findOnce();
-                            bounds = clickAdsButton.bounds();
-                            x = bounds.centerX();
-                            y = bounds.centerY();
-                            console.log("首次检测到广告的位置 点击坐标: " + x + ", " + y);
-                            if (!newClickAdsButton) {
-                                console.log("等待100ms后页面就检测不到");
-                            }else{
+                            // bounds = clickAdsButton.bounds();
+                            // x = bounds.centerX();
+                            // y = bounds.centerY();
+                            // console.log("首次检测到广告的位置 点击坐标: " + x + ", " + y);
+                            // if (!newClickAdsButton) {
+                            //     console.log("等待100ms后页面就检测不到");
+                            // }else{
+                                bounds = newClickAdsButton.bounds();
+                                x = bounds.centerX();
+                                y = bounds.centerY();
                                 console.log("等待100ms后检测到广告的位置 点击坐标: " + newClickAdsButton.bounds().centerX() 
                                 + ", " + newClickAdsButton.bounds().centerY());
-                            }
+                            // }
                             recycleView(newClickAdsButton);
-                            continue;
-                        } else {
-                            clickAdsButtonCount = 0;
-                            console.log("检测到按钮:" + clickAdsButton.text() + "，已申请到锁，正在点击...");
-                            bounds = clickAdsButton.bounds();
-                            x = bounds.centerX();
-                            y = bounds.centerY() - 80;//文字位置偏下，向上偏移
-                            sleep(5000);
-                            longClick(x, y);
-                            console.log(clickAdsButton.text() + "点击坐标: " + x + ", " + y);
-                        }
+                            // continue;
+                        // } else {
+                        //     clickAdsButtonCount = 0;
+                        //     bounds = clickAdsButton.bounds();
+                        //     x = bounds.centerX();
+                        //     y = bounds.centerY() - 80;//文字位置偏下，向上偏移
+                        //     // sleep(5000);
+                        //     longClick(x, y);
+                        //     console.log("检测到按钮:" + clickAdsButton.text() + "点击坐标: " + x + ", " + y);
+                        //     sleep(5000);
+                        //     if(currentPackage() != steampyPkg){
+                        //         console.log("第二次检测手势按钮点击成功");
+                        //     }
+                        // }
                     }
-                    //sleep让页面稳定，防止坐标正确却点击不到的问题；
-                    // sleep(100);
-                    // click(x, y);
                     gesture(120, [x, y], [x, y]);
                     sleep(100);
                     if(currentPackage() === steampyPkg && bounds) {  // 没发生跳转，可能按钮在靠右边的位置
@@ -435,6 +437,7 @@ window.startBtn.on("click", function () {
                     //发生了跳转，是继续按钮，跳转后需要滑动屏幕，解除滑动线程的阻塞 
                     //其他场景是点击观看视频 后 在windowschanged中解除阻塞
                     if (continueBtn) {
+                        console.log("点了很久也没跳转，而且有continuebtn，解除对滑动线程的阻塞");
                         speedBtnIntc.set(0);
                     }
                 } finally {
@@ -493,9 +496,8 @@ window.startBtn.on("click", function () {
             } else if (pkg !== steampyPkg) {
                 // 非 steampyPkg，计算已停留时间
                 let elapsed = Date.now() - enterTime;
-                console.log("已停留在" + pkg + elapsed + "ms");
                 // if (!actionTriggered && elapsed >= otherAppMaxTime) {
-                if (!actionTriggered && elapsed >= otherAppMaxTime) {
+                if (elapsed >= otherAppMaxTime) {
                     actionTriggered = true; // 防止重复触发
                     console.log("超时发生，准备切回，已停留在" + pkg + elapsed + "ms");
 
@@ -510,6 +512,7 @@ window.startBtn.on("click", function () {
                         sleep(100);
                         //特殊广告页，停在这里会接收不到toast，需要跳转
                         if (currentActivity() === "com.qq.e.ads.ADActivity") {
+                            console.log("尝试关闭京东广告页面")
                             click(1020.5, 167);
                         }
                     } finally {
@@ -518,6 +521,19 @@ window.startBtn.on("click", function () {
                     
                 }
             }
+            if (pkg === steampyPkg && !isSteamPyActivity(currentActivity())) {
+                // 海南合创共响网络科技有限公司
+                let quickApp = className("android.widget.TextView")
+                    .textMatches(/^海南合创共响网络科技有限公司.*/)
+                    .findOnce();
+                if (quickApp) {
+                    console.log("quickapp");
+                    click(163, 166);
+                }
+            }
+            
+                
+       
         }, 1000); // 每秒检测一次，平衡性能与精确度
     });
 
@@ -548,7 +564,7 @@ events.onToast(function (toast) {
                         try {
                             app.launchPackage(steampyPkg);
                             sleep(100);
-                            if (pkgAfterSleep !== steampyPkg){
+                            if (currentPackage() !== steampyPkg){
                                 console.log("二次跳转");
                                 app.launchPackage(steampyPkg);
                             }
@@ -671,11 +687,9 @@ function exitAds() {
                 // 点击右上角另一个位置的关闭按钮
                 // click(990, 95.5);
                 gesture(120, [987.5, 95.5], [992, 98]);
-                console.log("点击了(990, 95.5)")
                 // 点击左上角关闭按钮
                 click(86, 176);
-                console.log("点击了(86, 176)")
-                console.log("已点击左上角关闭按钮");
+                console.log("点击了(86, 176)" + "已点击左上角关闭按钮")
             }
         }
     } finally {
