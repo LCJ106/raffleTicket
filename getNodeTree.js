@@ -22,8 +22,8 @@ function traverseViews(view) {
 }
 
 // 获取当前页面的根控件
-// var root = className("android.widget.FrameLayout").findOne();
-var root = auto.windows[0];
+var root = className("android.widget.FrameLayout").findOne();
+// var root = auto.windows[0];
 
 // 开始遍历
 traverseViews(root);

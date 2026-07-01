@@ -9,8 +9,9 @@
 //     Intent.FLAG_ACTIVITY_CLEAR_TOP |
 //     Intent.FLAG_ACTIVITY_SINGLE_TOP
 // );
+console.log(currentPackage());
 console.log(currentActivity());
-
+app.launchPackage("com.steampy.app");
 
 
 

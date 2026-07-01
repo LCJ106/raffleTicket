@@ -18,6 +18,13 @@ y需要偏移高度的0.37
 退出键：centerX(985, 986).centerY(2316, 2317)
 
 
+匹歪的广告弹窗显示：
+ com.android.systemui  package
+12:45:25.284/D: android.widget.FrameLayout   activity
+
+com.miui.securitycenter
+com.miui.home
+
 
 
 
